@@ -22,7 +22,12 @@ void setup() {
   Serial.begin(115200);
   delay(5000);
   
-	imuInit(&enMotionSensorType);
+	init10DOF();
+
+}
+
+void init10DOF(){
+  imuInit(&enMotionSensorType);
  
 	if(IMU_EN_SENSOR_TYPE_MPU9250 == enMotionSensorType)
 	{
