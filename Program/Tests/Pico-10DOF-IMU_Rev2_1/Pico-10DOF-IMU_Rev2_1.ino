@@ -13,6 +13,9 @@ float PRESS_DATA=0;
 float TEMP_DATA=0;
 uint8_t u8Buf[3];
 
+bool cameraAccThreshold=false;
+float ACCEL_Z_THRESHOLD = 5.00;//acceleration in ms^-2
+float SEA_LEVEL_PRESSURE = 1013.25;//pressure in hPa
 
 void setup() {
   // put your setup code here, to run once:
@@ -41,6 +44,11 @@ void init10DOF(){
 }
 
 void loop() {
+
+  if(stAccelRawData.s16Z>=ACCEL_Z_THRESHOLD){
+      cameraAccThreshold = true;
+    }
+
   // put your main code here, to run repeatedly:
   LPS22HB_START_ONESHOT();
   if((I2C_readByte(LPS_STATUS)&0x01)==0x01)   //a new pressure data is generated
@@ -56,12 +64,20 @@ void loop() {
       u8Buf[1]=I2C_readByte(LPS_TEMP_OUT_H);
       TEMP_DATA=(float)((u8Buf[1]<<8)+u8Buf[0])/100.0f;
   }
+
+  float altitude = 44330 * [1 - (PRESS_DATA/SEA_LEVEL_PRESSURE)^(1/5.255) ]
         
   imuDataGet( &stAngles, &stGyroRawData, &stAccelRawData, &stMagnRawData);
+
   Serial.printf("\r\n /-------------------------------------------------------------/ \r\n");
   Serial.printf("\r\n Roll: %.2f     Pitch: %.2f     Yaw: %.2f \r\n",stAngles.fRoll, stAngles.fPitch, stAngles.fYaw);
   Serial.printf("Pressure = %6.2f hPa , Temperature = %6.2f C\r\n", PRESS_DATA, TEMP_DATA);
   //printf("\r\n Acceleration: X: %d     Y: %d     Z: %d \r\n",stAccelRawData.s16X, stAccelRawData.s16Y, stAccelRawData.s16Z);
   //printf("\r\n Gyroscope: X: %d     Y: %d     Z: %d \r\n",stGyroRawData.s16X, stGyroRawData.s16Y, stGyroRawData.s16Z);
   //printf("\r\n Magnetic: X: %d     Y: %d     Z: %d \r\n",stMagnRawData.s16X, stMagnRawData.s16Y, stMagnRawData.s16Z);
+
+  if(cameraAccThreshold&&(stAccelRawData.s16Z<=5.0)&&(stAccelRawData.s16X<=5.0)&&(stAccelRawData.s16Y<=5.0)&&(altitude<=500)){
+    turnCameraOff();
+  }
+
 }
