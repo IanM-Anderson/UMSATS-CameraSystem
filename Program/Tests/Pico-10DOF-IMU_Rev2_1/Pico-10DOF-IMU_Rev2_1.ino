@@ -13,12 +13,18 @@ float PRESS_DATA=0;
 float TEMP_DATA=0;
 uint8_t u8Buf[3];
 
+
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(115200);
   delay(5000);
   
-	imuInit(&enMotionSensorType);
+	init10DOF();
+
+}
+
+void init10DOF(){
+  imuInit(&enMotionSensorType);
  
 	if(IMU_EN_SENSOR_TYPE_MPU9250 == enMotionSensorType)
 	{
@@ -32,7 +38,6 @@ void setup() {
 		Serial.printf("LPS22HB Init Error\n");
 		exit(1);
 	}
-
 }
 
 void loop() {
