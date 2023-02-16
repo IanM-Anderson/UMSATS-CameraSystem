@@ -12,14 +12,22 @@ Therefore, we will know when the rocket hits the ground when all the acceleratio
 int accelOfset = 10; // value of the inacruacy of the sensor
 int altOfset = 100; // value of the margin of error of altitude
 
-// data = {roll(0), pitch(1), yaw(2), pressure(3), temp(4), accelX(5), accelY(6), accelZ(7), gyroX, gyroY, gyroZ, magX, magY, magZ}
-bool checkLanded(float data[14]){
+/*data format
+ * [0] -> Angle (roll,pitch,yaw)
+ * [1] -> Pressure (pressure,0,0)
+ * [2] -> Temperature (temperature,0,0)
+ * [3] -> Acceleration (x,y,z)
+ * [4] -> Gyroscope (x,y,z)
+ * [5] -> Magnetic (x,y,z)
+*/
+
+bool checkLanded(float data[6][3]){//need to check for proper parameter type, needs some testing
     // check if landed, return if so, return false if not
     bool cameraOff = false;
     // check if all accel values are 0 ish
-    if(data[5] <= accelOfset && data[6] <= accelOfset && data[7] <= accelOfset){
+    if(data[3][0] <= accelOfset && data[3][1] <= accelOfset && data[7] <= accelOfset){
         // now that accel is 0 ish check the altitude just to double check it has landed
-        float altitude = ((pow(1013.25/data[3], (1/5.257))-1) * (data[4]+273.15))/0.0065;
+        float altitude = ((pow(1013.25/data[1][0], (1/5.257))-1) * (data[2][0]+273.15))/0.0065;
         if(altitude <= altOfset){
             // turn the camera off since we know that it has landed
             cameraOff = true;
