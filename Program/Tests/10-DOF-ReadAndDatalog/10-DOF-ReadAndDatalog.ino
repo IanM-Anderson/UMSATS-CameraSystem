@@ -1,4 +1,3 @@
-
 #include "lps22hb.h"
 #include "imu.h"
 #include <stdio.h>
@@ -12,15 +11,7 @@ IMU_ST_ANGLES_DATA stAngles;
 IMU_ST_SENSOR_DATA stGyroRawData;
 IMU_ST_SENSOR_DATA stAccelRawData;
 IMU_ST_SENSOR_DATA stMagnRawData;
-float PRESS_DATA=0;
-float TEMP_DATA=0;
 uint8_t u8Buf[3];
-
-const int _MISO = 16;
-const int _MOSI = 19;
-const int _CS = 17;
-const int _SCK = 18;
-
 /**
  * The 2D Array is formatted as:
  * [0] -> Angle (roll,pitch,yaw)
@@ -31,44 +22,77 @@ const int _SCK = 18;
  * [5] -> Magnetic (x,y,z)
  */
 float data1[5][3] = {{0,0,0},{0,0,0},{0,0,0},{0,0,0},{0,0,0}};
+float PRESS_DATA=0;
+float TEMP_DATA=0;
+
+// pins for the datalogger
+const int _MISO = 16;
+const int _MOSI = 19;
+const int _CS = 17;
+const int _SCK = 18;
+
+void beepBepper(int pin, int frequency, int duration){
+    // send a tone with frequency to a pin
+    tone(pin, frequency);
+    delay(duration); // keep the tone going for some duration
+    noTone(pin); // turn off the tone
+}
 
 void setup(){
-    Serial.begin(115200);
-    while(init10DOF() == false){
-        Serial.println("ERROR init 10-DOF");
-    }
+    Serial.begin(115200); // start the serial monitor
+    // ------------- Datalogger ---------------
     // Ensure the SPI pinout the SD card is connected to is configured properly
     SPI.setRX(_MISO);
     SPI.setTX(_MOSI);
     SPI.setSCK(_SCK);
-
     // see if the card is present and can be initialized:
     while(!SD.begin(_CS))
     {
-      Serial.println("ERROR init 10-DOF");
+      Serial.println("ERROR init SD");
+      // there is an error so beep multiple times
+      // code for SD error:
+      beepBepper(0, 1000, 100);
+      beepBepper(0, 1000, 100);
+      delay(2000); // wait before you try to init again
     }
-    tone(0, 500);
-    delay(500);
-    noTone(0);
-    delay(500);
-    tone(0, 500);
-    delay(500);
-    noTone(0); 
+
+    // ------------------ 10-DOF -----------------
+    while(init10DOF() == false){
+        Serial.println("ERROR init 10-DOF");
+        // there is an error so beep multiple times
+        // code for 10-DOF error:
+        beepBepper(0, 1000, 100);
+        beepBepper(0, 1000, 100);
+        delay(200);
+        beepBepper(0, 1000, 100);
+        beepBepper(0, 1000, 100);
+        beepBepper(0, 1000, 100);
+        delay(2000); // wait before you try to init again
+    }
+
+    // Now everything is verified to be working
+    // beep to indicate it is all good
+    beepBepper(0, 500, 1000);
 }
 
 bool init10DOF()
 {
+    // init the imu sensor
     imuInit(&enMotionSensorType);
- 
+    // check the IMU sensor type
 	if(IMU_EN_SENSOR_TYPE_MPU9250 == enMotionSensorType)
 	{
 		Serial.printf("Motion sersor is MPU9250\n" );
 	}
+
+    // init the main sensor
 	if (!LPS22HB_INIT()){
+        // if there was a error
 		Serial.printf("LPS22HB Init Error\n");
-		return false;
+		return false; // return false because of error
 	}
-  return true;
+    // there is no error so return true
+    return true;
 }
 
 void loop(){
@@ -122,13 +146,23 @@ void datalog10DOF(float data[5][3]){
     // Store all the data in the SD card
     // make a string for assembling the data to log:
     String dataString = "";
-    // loop through all the elements in the array and add them to the dataString
-    for(int i = 0; i <= 5; i++){
-        for(int j = 0; j <= 3; j++){
-            dataString += data[i][j];
-            dataString += ", ";
-        }
-    }
+    /**
+     * The 2D Array is formatted as:
+     * [0] -> Angle (roll,pitch,yaw)
+     * [1] -> Pressure (pressure,0,0)
+     * [2] -> Temperature (temperature,0,0)
+     * [3] -> Acceleration (x,y,z)
+     * [4] -> Gyroscope (x,y,z)
+     * [5] -> Magnetic (x,y,z)
+    */
+    dataString += "ROLL: {" + data[0][0] + "};  ";
+    dataString += "PITCH: {" + data[0][1] + "};  ";
+    dataString += "YAW: {" + data[0][2] + "};  ";
+    dataString += "PRESSURE: {" + data[1][0] + "};  ";
+    dataString += "TEMP: {" + data[2][0] + "};  ";
+    dataString += "ACCELERATION: " + "{" + data[3][0] + "}x, {" + data[3][1] + "}y, {" + data[3][2] + "}z;  ";
+    dataString += "GYROSCOPE: " + "{" + data[4][0] + "}x, {" + data[4][1] + "}y, {" + data[4][2] + "}z;  ";
+    dataString += "MAGNETIC: " + "{" + data[5][0] + "}x, {" + data[5][1] + "}y, {" + data[5][2] + "}z";
 
     // open the file
     File dataFile = SD.open("datalog.txt", FILE_WRITE);
