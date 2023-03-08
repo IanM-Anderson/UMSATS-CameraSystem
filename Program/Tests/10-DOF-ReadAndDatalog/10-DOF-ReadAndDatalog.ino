@@ -1,23 +1,19 @@
-// main program to run the camera system
 #include "lps22hb.h"
 #include "imu.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <SPI.h>
+#include <SD.h>
 
 IMU_EN_SENSOR_TYPE enMotionSensorType;
 IMU_ST_ANGLES_DATA stAngles;
 IMU_ST_SENSOR_DATA stGyroRawData;
 IMU_ST_SENSOR_DATA stAccelRawData;
 IMU_ST_SENSOR_DATA stMagnRawData;
-float PRESS_DATA = 0;
-float TEMP_DATA = 0;
 uint8_t u8Buf[3];
-
-// ---------------------------------------- Variables ----------------------------------------------
-// 10-DOF:
-/*
- * The 2D Array for 10-DOF is formatted as:
+/**
+ * The 2D Array is formatted as:
  * [0] -> Angle (roll,pitch,yaw)
  * [1] -> Pressure (pressure,0,0)
  * [2] -> Temperature (temperature,0,0)
@@ -26,12 +22,14 @@ uint8_t u8Buf[3];
  * [5] -> Magnetic (x,y,z)
  */
 float dataArray[5][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
-float ACCEL_Z_THRESHOLD = 5.00;      //acceleration in ms^-2
-int ALT_SHUTOFF = 100;               // value of the margin of error of altitude
-float SEA_LEVEL_PRESSURE = 1013.25;  //pressure in hPa
+float PRESS_DATA = 0;
+float TEMP_DATA = 0;
 
-bool rocketStart = false;
-// ------------------------------------------------------------------------------------------------------
+// pins for the datalogger
+const int _MISO = 16;
+const int _MOSI = 19;
+const int _CS = 17;
+const int _SCK = 18;
 
 void beepBepper(int pin, int frequency, int duration) {
   // send a tone with frequency to a pin
@@ -41,31 +39,43 @@ void beepBepper(int pin, int frequency, int duration) {
 }
 
 void setup() {
-  Serial.begin(115200);
-  // init camera
-  // check init
-
-  // init Datalogger
-  // check init
-
-  // init 10-DOF
-  // check init
-  while (init10DOF() == false) {
-    Serial.println("ERROR init 10-DOF");
-    delay(100);
+  Serial.begin(115200);  // start the serial monitor
+  pinMode(LED_BUILTIN, OUTPUT);
+  // ------------- Datalogger ---------------
+  // Ensure the SPI pinout the SD card is connected to is configured properly
+  SPI.setRX(_MISO);
+  SPI.setTX(_MOSI);
+  SPI.setSCK(_SCK);
+  // see if the card is present and can be initialized:
+  while (!SD.begin(_CS)) {
+    Serial.println("ERROR init SD");
+    // there is an error so beep multiple times
+    // code for SD error:
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    delay(2000);  // wait before you try to init again
   }
 
-  // beep beeper to indicate that it has inited
-  beepBepper(0, 500, 700);
+  // ------------------ 10-DOF -----------------
+  while (init10DOF() == false) {
+    Serial.println("ERROR init 10-DOF");
+    // there is an error so beep multiple times
+    // code for 10-DOF error:
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    delay(200);
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    delay(2000);  // wait before you try to init again
+  }
 
-  // I dont know if this is needed (i might get rid of it)
-  // test the camera, datalogger and 10-DOF
-  // beep, beep, beep
-
-  // start camera recording
+  // Now everything is verified to be working
+  // beep to indicate it is all good
+  beepBepper(0, 500, 1000);
 }
 
-bool init10DOF() {
+bool init10DOF(){
   // init 10-DOF and return true if successful
   bool initiated = true;
   // init the IMU sensor
@@ -81,32 +91,15 @@ bool init10DOF() {
     Serial.printf("LPS22HB Init Error\n");
     initiated = false;
   }
-  return initiated;  // return true or false if inited
+  return initiated; // return true or false if inited
 }
 
 void loop() {
-  // read 10-DOF values
   read10DOFData();
-  // check rocket start
-  if (!rocketStart) {
-    rocketStart = checkRocketStart(dataArray);
-  }
-  // if the rocket has started then it will start to check if it has landed
-  // if it has both started and landed then turn everything off
-  if (rocketStart && checkLanded(dataArray)) {
-    // turn off camera
-    // finish logging anything
-    // turn pico to sleep mode
-  }
-  // check storage
-  // if full delet oldest data if not save data
-  datalog10DOF(dataArray)
+  datalog10DOF(dataArray);
+  delay(200);
 }
 
-/**
- * Reads data from 10DOF sensors
- * Updates the 2d array for data with the new values
- */
 void read10DOFData() {
 
   //anglesPiYaRo, pressure, tempertaure, accelerationXYZ, gyroscopeXYZ, magneticXYZ
@@ -146,26 +139,6 @@ void read10DOFData() {
   dataArray[5][0] = stMagnRawData.s16X;
   dataArray[5][1] = stMagnRawData.s16Y;
   dataArray[5][2] = stMagnRawData.s16Z;
-}
-
-bool checkRocketStart(float data[][]) {
-  return data[3][2] >= ACCEL_Z_THRESHOLD
-}
-
-bool checkLanded(float data[][]) {  //need to check for proper parameter type, needs some testing
-  // check if landed, return if so, return false if not
-  bool cameraOff = false;
-  // check if all accel values are 0 ish
-  if (data[3][0] <= accelOfset && data[3][1] <= accelOfset && data[7] <= accelOfset) {
-    // now that accel is 0 ish check the altitude just to double check it has landed
-    float altitude = ((pow(SEA_LEVEL_PRESSURE / data[1][0], (1 / 5.257)) - 1) * (data[2][0] + 273.15)) / 0.0065;
-    if (altitude <= ALT_SHUTOFF) {
-      // turn the camera off since we know that it has landed
-      cameraOff = true;
-    }
-  }
-
-  return cameraOff;  //cameraOff is a bool and will turn true
 }
 
 void datalog10DOF(float data[5][3]) {
@@ -223,11 +196,13 @@ void datalog10DOF(float data[5][3]) {
 
   // if the file is available, write to it:
   if (dataFile) {
+    digitalWrite(LED_BUILTIN, LOW);
     dataFile.println(dataString);
     dataFile.close();
   }
   // if the file isn't open, pop up an error:
   else {
+    digitalWrite(LED_BUILTIN, HIGH);  // turn the LED on (HIGH is the voltage level)
     Serial.println("error opening datalog.txt");
   }
 }
