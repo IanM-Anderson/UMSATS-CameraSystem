@@ -155,14 +155,42 @@ void datalog10DOF(float data[5][3]){
      * [4] -> Gyroscope (x,y,z)
      * [5] -> Magnetic (x,y,z)
     */
-    dataString += "ROLL: {" + data[0][0] + "};  ";
-    dataString += "PITCH: {" + data[0][1] + "};  ";
-    dataString += "YAW: {" + data[0][2] + "};  ";
-    dataString += "PRESSURE: {" + data[1][0] + "};  ";
-    dataString += "TEMP: {" + data[2][0] + "};  ";
-    dataString += "ACCELERATION: " + "{" + data[3][0] + "}x, {" + data[3][1] + "}y, {" + data[3][2] + "}z;  ";
-    dataString += "GYROSCOPE: " + "{" + data[4][0] + "}x, {" + data[4][1] + "}y, {" + data[4][2] + "}z;  ";
-    dataString += "MAGNETIC: " + "{" + data[5][0] + "}x, {" + data[5][1] + "}y, {" + data[5][2] + "}z";
+    dataString += "ROLL: |";
+    dataString += data[0][0];
+    dataString += "|;  ";
+    dataString += "PITCH: |";
+    dataString += data[0][1];
+    dataString += "|;  ";
+    dataString += "YAW: |";
+    dataString += data[0][2];
+    dataString += "|;  ";
+    dataString += "PRESSURE: |";
+    dataString += data[1][0];
+    dataString += "|;  ";
+    dataString += "TEMP: |";
+    dataString += data[2][0];
+    dataString += "|;  ";
+    dataString += "ACCELERATION: |";
+    dataString += data[3][0];
+    dataString += "|x, |";
+    dataString += data[3][1];
+    dataString += "|y, |";
+    dataString += data[3][2];
+    dataString += "|z;  ";
+    dataString += "GYROSCOPE: |";
+    dataString += data[4][0];
+    dataString += "|x, |";
+    dataString += data[4][1];
+    dataString += "|y, |";
+    dataString += data[4][2];
+    dataString += "|z;  ";
+    dataString += "MAGNETIC: |";
+    dataString += data[5][0];
+    dataString += "|x, |";
+    dataString += data[5][1];
+    dataString += "|y, |";
+    dataString += data[5][2];
+    dataString += "|z";
 
     // open the file
     File dataFile = SD.open("datalog.txt", FILE_WRITE);
