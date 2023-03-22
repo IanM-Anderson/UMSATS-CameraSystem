@@ -33,20 +33,6 @@ const int _CS = 17;
 const int _SCK = 18;
 //---------------------------------------------------------------------------------------------------------
 
-/**
- * Sends a tone to a buzzer from a pin on the pico for a certain duration
- * 
- * @param pin The pin that the buzzer is conneceted to
- * @param frequency The frequency of the tone being sent to the buzzer
- * @param duration The length the sound will go for
-*/
-void beepBepper(int pin, int frequency, int duration) {
-  // send a tone with frequency to a pin
-  tone(pin, frequency);
-  delay(duration);  // keep the tone going for some duration
-  noTone(pin);      // turn off the tone
-}
-
 void setup() {
   Serial.begin(115200);  // start the serial monitor
   pinMode(LED_BUILTIN, OUTPUT);
@@ -62,7 +48,7 @@ void setup() {
     // there is an error so beep multiple times
     // code for SD error:
     beepBepper(0, 1000, 100);
-    beepBepper(0, 1000, 100);
+    // beepBepper(0, 1000, 100);
     delay(2000);  // wait before you try to init again
   }
   // -- Test SD
@@ -97,6 +83,27 @@ void setup() {
   beepBepper(0, 500, 1000);
 }
 
+void loop() {
+  // For every loop, read the 10-DOF data then store the data on the SD card
+  read10DOFData(); // read data
+  datalog10DOF(dataArray); // store data
+  delay(200); // wait 0.2s
+}
+
+/**
+ * Sends a tone to a buzzer from a pin on the pico for a certain duration
+ * 
+ * @param pin The pin that the buzzer is conneceted to
+ * @param frequency The frequency of the tone being sent to the buzzer
+ * @param duration The length the sound will go for
+*/
+void beepBepper(int pin, int frequency, int duration) {
+  // send a tone with frequency to a pin
+  tone(pin, frequency);
+  delay(duration);  // keep the tone going for some duration
+  noTone(pin);      // turn off the tone
+}
+
 /**
  * Tests the SD card by writing a specific line to it then read the SD card
  * to make sure that it was written correctly
@@ -106,9 +113,12 @@ void setup() {
 bool testSD(){
   bool testSuc = false;
   
-  String testLine = "!test!";
+  String testLine = "!test!"; // the string we are looking for
+  // opens the SD card file in write mode
   File dataFile1 = SD.open("datalog.txt", FILE_WRITE);
-  dataFile1.println("!test!<*");
+  // print our test line to the file
+  dataFile1.print(testline);
+  dataFile1.print("<*"); // add some chars at the end in order to select only the testline
   dataFile1.close();
 
   File dataFile2 = SD.open("datalog.txt", FILE_READ);
@@ -118,7 +128,6 @@ bool testSD(){
   String testLine2 = testLine1.substring(startPoint, endPoint); // stores the String from '!' to but not including '<'
   Serial.println(testLine2);
   // check to see if testLine2 is equal to "!test!"
-  // if not
   if(testLine.equals(testLine2)){
     // then print ok!
     Serial.println("YAH!!!!");
@@ -151,12 +160,6 @@ bool init10DOF(){
     initiated = false;
   }
   return initiated; // return true or false if inited
-}
-
-void loop() {
-  read10DOFData();
-  datalog10DOF(dataArray);
-  delay(200);
 }
 
 /**
