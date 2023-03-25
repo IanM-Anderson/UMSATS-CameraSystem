@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdint.h>
+#include <SPI.h>
+#include <SD.h>
 
 IMU_EN_SENSOR_TYPE enMotionSensorType;
 IMU_ST_ANGLES_DATA stAngles;
@@ -15,6 +17,9 @@ float TEMP_DATA = 0;
 uint8_t u8Buf[3];
 
 // ---------------------------------------- Variables ----------------------------------------------
+float SEA_LEVEL_PRESSURE = 1013.25;  //pressure in hPa
+bool rocketStart = false;
+
 // 10-DOF:
 /*
  * The 2D Array for 10-DOF is formatted as:
@@ -26,11 +31,12 @@ uint8_t u8Buf[3];
  * [5] -> Magnetic (x,y,z)
  */
 float dataArray[5][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
-float ACCEL_Z_THRESHOLD = 5.00;      //acceleration in ms^-2
-int ALT_SHUTOFF = 100;               // value of the margin of error of altitude
-float SEA_LEVEL_PRESSURE = 1013.25;  //pressure in hPa
+float ACCEL_Z_THRESHOLD = 0.00;  // acceleration in g   // number to detect launch
+int ALT_SHUTOFF = 500;           // value of the margin of error of altitude
+int accelOfset = 0;
 
-bool rocketStart = false;
+int SHUTOFF_ACCEL_COUNT = 500;  // the number of 0 accel values needed in a row before shut down
+int nulAccelCounter = 0;        // var to store the number of 0 accel values in a row
 // ------------------------------------------------------------------------------------------------------
 
 void beepBepper(int pin, int frequency, int duration) {
@@ -42,14 +48,11 @@ void beepBepper(int pin, int frequency, int duration) {
 
 void setup() {
   Serial.begin(115200);
-  // init camera
-  // check init
+  // ******* init camera and check that it is inited
 
-  // init Datalogger
-  // check init
+  // ******* init Datalogger and check that it is inited
 
-  // init 10-DOF
-  // check init
+  // init 10-DOF and check that it is inited
   while (init10DOF() == false) {
     Serial.println("ERROR init 10-DOF");
     delay(100);
@@ -59,10 +62,13 @@ void setup() {
   beepBepper(0, 500, 700);
 
   // I dont know if this is needed (i might get rid of it)
-  // test the camera, datalogger and 10-DOF
-  // beep, beep, beep
+  // ******* test the camera, datalogger and 10-DOF
+  // beep, beep, beep to indicate that the tests have passed
+  beepBepper(0, 500, 200);
+  beepBepper(0, 500, 200);
+  beepBepper(0, 500, 200);
 
-  // start camera recording
+  // ******* start camera recording
 }
 
 bool init10DOF() {
@@ -72,13 +78,13 @@ bool init10DOF() {
   imuInit(&enMotionSensorType);
   // check the IMU sensor type
   if (IMU_EN_SENSOR_TYPE_MPU9250 == enMotionSensorType) {
-    Serial.printf("Motion sersor is MPU9250\n");
+    Serial.println("Motion sersor is MPU9250\n");
   }
 
   // init the main sensor
   if (!LPS22HB_INIT()) {
     // if there was a error
-    Serial.printf("LPS22HB Init Error\n");
+    Serial.println("LPS22HB Init Error\n");
     initiated = false;
   }
   return initiated;  // return true or false if inited
@@ -87,20 +93,48 @@ bool init10DOF() {
 void loop() {
   // read 10-DOF values
   read10DOFData();
+  Serial.println(dataArray[3][0]);
+  Serial.println(dataArray[3][1]);
+  Serial.println(dataArray[3][2]);
+
+  // loop 30 times so that we can settle the readings
+  for (int i = 0; i <= 30; i++) {
+    read10DOFData();
+    delay(10);
+  }
+  // now that the readings are stable get the net accel for when it is resting
+  accelOfset = sqrt(pow(dataArray[3][0], 2) + pow(dataArray[3][1], 2) + pow(dataArray[3][2], 2));
+
   // check rocket start
-  if (!rocketStart) {
+  if (!rocketStart) {  // maybe change to a while loop
     rocketStart = checkRocketStart(dataArray);
   }
+
   // if the rocket has started then it will start to check if it has landed
-  // if it has both started and landed then turn everything off
+  // if it has both started and landed for x loops then turn everything off
   if (rocketStart && checkLanded(dataArray)) {
-    // turn off camera
-    // finish logging anything
-    // turn pico to sleep mode
+    nulAccelCounter++;
+    // check to see if the checkLanded function is true for x amount of loops
+    if (nulAccelCounter == SHUTOFF_ACCEL_COUNT) {
+      Serial.println("CAMERA OFF!!!!!!!!!!!!!!!");
+      // ******* turn off camera
+      // ******* finish logging anything
+      // ******* turn pico to sleep mode
+    }
   }
-  // check storage
-  // if full delet oldest data if not save data
-  datalog10DOF(dataArray)
+  // the else makes sure that the camera will only turn off after the accel is 0 for x duration
+  // if the rocket is still moving in the air (or has not started yet)
+  else {
+    Serial.println("Not Camera Off");
+    // insure that the nulAccelCounter is 0 while the rocket is still moving
+    nulAccelCounter = 0;
+  }
+
+  // ******* check storage
+  // ******* if full delet oldest data if not save data
+
+  // if we want we can data log the 10-DOF data (uncomment the line)
+  //datalog10DOF(dataArray)
 }
 
 /**
@@ -148,24 +182,30 @@ void read10DOFData() {
   dataArray[5][2] = stMagnRawData.s16Z;
 }
 
-bool checkRocketStart(float data[][]) {
-  return data[3][2] >= ACCEL_Z_THRESHOLD
+bool checkRocketStart(float data[5][3]) {  // needs testing
+  Serial.print("Rocket Start: ");
+  Serial.println(data[3][2] >= ACCEL_Z_THRESHOLD);
+  return data[3][2] >= ACCEL_Z_THRESHOLD;
 }
 
-bool checkLanded(float data[][]) {  //need to check for proper parameter type, needs some testing
+bool checkLanded(float data[5][3]) {  // needs testing
   // check if landed, return if so, return false if not
-  bool cameraOff = false;
-  // check if all accel values are 0 ish
-  if (data[3][0] <= accelOfset && data[3][1] <= accelOfset && data[7] <= accelOfset) {
+  bool landed = false;
+  float netAccel = sqrt(pow(data[3][0], 2) + pow(data[3][1], 2) + pow(data[3][2], 2));
+  // check if z accel value is 0 ish
+  if (netAccel <= accelOfset) {
     // now that accel is 0 ish check the altitude just to double check it has landed
     float altitude = ((pow(SEA_LEVEL_PRESSURE / data[1][0], (1 / 5.257)) - 1) * (data[2][0] + 273.15)) / 0.0065;
+    // Serial.print("Altitude: ");
+    // Serial.println(altitude);
     if (altitude <= ALT_SHUTOFF) {
-      // turn the camera off since we know that it has landed
-      cameraOff = true;
+      // we know that it has landed
+      landed = true;
     }
   }
-
-  return cameraOff;  //cameraOff is a bool and will turn true
+  Serial.print("Landed: ");
+  Serial.println(landed);
+  return landed;  //landed is a bool and will turn true
 }
 
 void datalog10DOF(float data[5][3]) {

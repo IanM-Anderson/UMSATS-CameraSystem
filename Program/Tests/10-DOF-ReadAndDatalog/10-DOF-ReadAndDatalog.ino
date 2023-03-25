@@ -117,7 +117,7 @@ bool testSD(){
   // opens the SD card file in write mode
   File dataFile1 = SD.open("datalog.txt", FILE_WRITE);
   // print our test line to the file
-  dataFile1.print(testline);
+  dataFile1.print(testLine);
   dataFile1.print("<*"); // add some chars at the end in order to select only the testline
   dataFile1.close();
 
@@ -126,11 +126,9 @@ bool testSD(){
   int endPoint = testLine1.indexOf('<'); // finds the index of the char '<'
   int startPoint = testLine1.indexOf('!'); // finds the index of the char '!'
   String testLine2 = testLine1.substring(startPoint, endPoint); // stores the String from '!' to but not including '<'
-  Serial.println(testLine2);
   // check to see if testLine2 is equal to "!test!"
   if(testLine.equals(testLine2)){
     // then print ok!
-    Serial.println("YAH!!!!");
     testSuc = true;
   }
   // close the data file
@@ -261,7 +259,7 @@ void datalog10DOF(float data[5][3]) {
   dataString += data[5][2];
   dataString += "|z";
 
-  Serial.println(dataString);
+  //Serial.println(dataString);
 
   // open the file
   File dataFile = SD.open("datalog.txt", FILE_WRITE);
