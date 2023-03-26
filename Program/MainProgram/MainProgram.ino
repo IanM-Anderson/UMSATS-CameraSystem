@@ -33,7 +33,7 @@ bool rocketStart = false;
 float dataArray[5][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
 float ACCEL_Z_THRESHOLD = 0.00;  // acceleration in g   // number to detect launch
 int ALT_SHUTOFF = 500;           // value of the margin of error of altitude
-int accelOfset = 0;
+int NET_RESTING_ACCEL_VALUE = 0;
 
 int SHUTOFF_ACCEL_COUNT = 500;  // the number of 0 accel values needed in a row before shut down
 int nulAccelCounter = 0;        // var to store the number of 0 accel values in a row
@@ -59,14 +59,14 @@ void setup() {
   }
 
   // beep beeper to indicate that it has inited
-  beepBepper(0, 500, 700);
+  beepBepper(0, 1000, 700);
 
   // I dont know if this is needed (i might get rid of it)
   // ******* test the camera, datalogger and 10-DOF
   // beep, beep, beep to indicate that the tests have passed
-  beepBepper(0, 500, 200);
-  beepBepper(0, 500, 200);
-  beepBepper(0, 500, 200);
+  beepBepper(0, 1000, 200);
+  beepBepper(0, 1000, 200);
+  beepBepper(0, 1000, 200);
 
   // ******* start camera recording
 }
@@ -84,7 +84,6 @@ bool init10DOF() {
   // init the main sensor
   if (!LPS22HB_INIT()) {
     // if there was a error
-    Serial.println("LPS22HB Init Error\n");
     initiated = false;
   }
   return initiated;  // return true or false if inited
@@ -97,16 +96,18 @@ void loop() {
   Serial.println(dataArray[3][1]);
   Serial.println(dataArray[3][2]);
 
+  // ------- REMOVE AFTER TESTING ---------------
   // loop 30 times so that we can settle the readings
   for (int i = 0; i <= 30; i++) {
     read10DOFData();
     delay(10);
   }
   // now that the readings are stable get the net accel for when it is resting
-  accelOfset = sqrt(pow(dataArray[3][0], 2) + pow(dataArray[3][1], 2) + pow(dataArray[3][2], 2));
+  NET_RESTING_ACCEL_VALUE = sqrt(pow(dataArray[3][0], 2) + pow(dataArray[3][1], 2) + pow(dataArray[3][2], 2));
+  // ---------------------------------------------
 
   // check rocket start
-  if (!rocketStart) {  // maybe change to a while loop
+  if (!rocketStart) {
     rocketStart = checkRocketStart(dataArray);
   }
 
@@ -192,12 +193,14 @@ bool checkLanded(float data[5][3]) {  // needs testing
   // check if landed, return if so, return false if not
   bool landed = false;
   float netAccel = sqrt(pow(data[3][0], 2) + pow(data[3][1], 2) + pow(data[3][2], 2));
+  Serial.print("Net Accel: ");
+  Serial.println(netAccel);
   // check if z accel value is 0 ish
-  if (netAccel <= accelOfset) {
+  if (netAccel <= NET_RESTING_ACCEL_VALUE) {
     // now that accel is 0 ish check the altitude just to double check it has landed
     float altitude = ((pow(SEA_LEVEL_PRESSURE / data[1][0], (1 / 5.257)) - 1) * (data[2][0] + 273.15)) / 0.0065;
-    // Serial.print("Altitude: ");
-    // Serial.println(altitude);
+    Serial.print("Altitude: ");
+    Serial.println(altitude);
     if (altitude <= ALT_SHUTOFF) {
       // we know that it has landed
       landed = true;
