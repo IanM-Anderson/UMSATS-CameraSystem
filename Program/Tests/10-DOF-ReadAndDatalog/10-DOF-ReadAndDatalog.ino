@@ -12,6 +12,7 @@ IMU_ST_SENSOR_DATA stGyroRawData;
 IMU_ST_SENSOR_DATA stAccelRawData;
 IMU_ST_SENSOR_DATA stMagnRawData;
 uint8_t u8Buf[3];
+// -------------------------------------------- Variables ----------------------------------------------
 /**
  * The 2D Array is formatted as:
  * [0] -> Angle (roll,pitch,yaw)
@@ -30,13 +31,7 @@ const int _MISO = 16;
 const int _MOSI = 19;
 const int _CS = 17;
 const int _SCK = 18;
-
-void beepBepper(int pin, int frequency, int duration) {
-  // send a tone with frequency to a pin
-  tone(pin, frequency);
-  delay(duration);  // keep the tone going for some duration
-  noTone(pin);      // turn off the tone
-}
+//---------------------------------------------------------------------------------------------------------
 
 void setup() {
   Serial.begin(115200);  // start the serial monitor
@@ -47,16 +42,30 @@ void setup() {
   SPI.setTX(_MOSI);
   SPI.setSCK(_SCK);
   // see if the card is present and can be initialized:
+  
   while (!SD.begin(_CS)) {
     Serial.println("ERROR init SD");
     // there is an error so beep multiple times
     // code for SD error:
     beepBepper(0, 1000, 100);
-    beepBepper(0, 1000, 100);
+    // beepBepper(0, 1000, 100);
     delay(2000);  // wait before you try to init again
+  }
+  // -- Test SD
+  while (!testSD()){
+    Serial.println("Error, SD test");
+    while(!SD.begin(_CS)){
+      Serial.println("ERROR init SD");
+      // there is an error so beep multiple times
+      // code for SD error:
+      beepBepper(0, 1000, 100);
+      beepBepper(0, 1000, 100);
+      delay(2000);  // wait before you try to init again
+    }
   }
 
   // ------------------ 10-DOF -----------------
+  // -- init
   while (init10DOF() == false) {
     Serial.println("ERROR init 10-DOF");
     // there is an error so beep multiple times
@@ -69,12 +78,69 @@ void setup() {
     beepBepper(0, 1000, 100);
     delay(2000);  // wait before you try to init again
   }
-
   // Now everything is verified to be working
   // beep to indicate it is all good
   beepBepper(0, 500, 1000);
 }
 
+void loop() {
+  // For every loop, read the 10-DOF data then store the data on the SD card
+  read10DOFData(); // read data
+  datalog10DOF(dataArray); // store data
+  delay(200); // wait 0.2s
+}
+
+/**
+ * Sends a tone to a buzzer from a pin on the pico for a certain duration
+ * 
+ * @param pin The pin that the buzzer is conneceted to
+ * @param frequency The frequency of the tone being sent to the buzzer
+ * @param duration The length the sound will go for
+*/
+void beepBepper(int pin, int frequency, int duration) {
+  // send a tone with frequency to a pin
+  tone(pin, frequency);
+  delay(duration);  // keep the tone going for some duration
+  noTone(pin);      // turn off the tone
+}
+
+/**
+ * Tests the SD card by writing a specific line to it then read the SD card
+ * to make sure that it was written correctly
+ * 
+ * @return Returns if the test was successful or not
+*/
+bool testSD(){
+  bool testSuc = false;
+  
+  String testLine = "!test!"; // the string we are looking for
+  // opens the SD card file in write mode
+  File dataFile1 = SD.open("datalog.txt", FILE_WRITE);
+  // print our test line to the file
+  dataFile1.print(testLine);
+  dataFile1.print("<*"); // add some chars at the end in order to select only the testline
+  dataFile1.close();
+
+  File dataFile2 = SD.open("datalog.txt", FILE_READ);
+  String testLine1 = dataFile2.readStringUntil('*'); // stores a String until it finds the char '*'
+  int endPoint = testLine1.indexOf('<'); // finds the index of the char '<'
+  int startPoint = testLine1.indexOf('!'); // finds the index of the char '!'
+  String testLine2 = testLine1.substring(startPoint, endPoint); // stores the String from '!' to but not including '<'
+  // check to see if testLine2 is equal to "!test!"
+  if(testLine.equals(testLine2)){
+    // then print ok!
+    testSuc = true;
+  }
+  // close the data file
+  dataFile2.close();
+  return testSuc;
+}
+
+/**
+ * inits the 10-DOF and return is the init was good
+ * 
+ * @return Returns if the 10-DOF was inited
+*/
 bool init10DOF(){
   // init 10-DOF and return true if successful
   bool initiated = true;
@@ -94,12 +160,9 @@ bool init10DOF(){
   return initiated; // return true or false if inited
 }
 
-void loop() {
-  read10DOFData();
-  datalog10DOF(dataArray);
-  delay(200);
-}
-
+/**
+ * reads and stores the 10-DOF values in the global array
+*/
 void read10DOFData() {
 
   //anglesPiYaRo, pressure, tempertaure, accelerationXYZ, gyroscopeXYZ, magneticXYZ
@@ -141,6 +204,11 @@ void read10DOFData() {
   dataArray[5][2] = stMagnRawData.s16Z;
 }
 
+/**
+ * Stores the values from the 10-DOF sensors to the SD card
+ * 
+ * @param data The array of values to be stored
+*/
 void datalog10DOF(float data[5][3]) {
   // Store all the data in the SD card
   // make a string for assembling the data to log:
@@ -190,6 +258,8 @@ void datalog10DOF(float data[5][3]) {
   dataString += "|y, |";
   dataString += data[5][2];
   dataString += "|z";
+
+  //Serial.println(dataString);
 
   // open the file
   File dataFile = SD.open("datalog.txt", FILE_WRITE);
