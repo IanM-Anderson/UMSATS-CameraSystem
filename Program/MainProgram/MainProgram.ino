@@ -33,7 +33,7 @@ bool rocketStart = false;
 float dataArray[5][3] = { { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 }, { 0, 0, 0 } };
 float ACCEL_Z_THRESHOLD = 0.00;  // acceleration in g   // number to detect launch
 int ALT_SHUTOFF = 500;           // value of the margin of error of altitude
-int NET_RESTING_ACCEL_VALUE = 0;
+int NET_RESTING_ACCEL_VALUE = 17000;
 
 int SHUTOFF_ACCEL_COUNT = 500;  // the number of 0 accel values needed in a row before shut down
 int nulAccelCounter = 0;        // var to store the number of 0 accel values in a row
@@ -92,19 +92,9 @@ bool init10DOF() {
 void loop() {
   // read 10-DOF values
   read10DOFData();
-  Serial.println(dataArray[3][0]);
-  Serial.println(dataArray[3][1]);
-  Serial.println(dataArray[3][2]);
-
-  // ------- REMOVE AFTER TESTING ---------------
-  // loop 30 times so that we can settle the readings
-  for (int i = 0; i <= 30; i++) {
-    read10DOFData();
-    delay(10);
-  }
-  // now that the readings are stable get the net accel for when it is resting
-  NET_RESTING_ACCEL_VALUE = sqrt(pow(dataArray[3][0], 2) + pow(dataArray[3][1], 2) + pow(dataArray[3][2], 2));
-  // ---------------------------------------------
+  // Serial.println(dataArray[3][0]);
+  // Serial.println(dataArray[3][1]);
+  // Serial.println(dataArray[3][2]);
 
   // check rocket start
   if (!rocketStart) {
@@ -117,10 +107,10 @@ void loop() {
     nulAccelCounter++;
     // check to see if the checkLanded function is true for x amount of loops
     if (nulAccelCounter == SHUTOFF_ACCEL_COUNT) {
-      Serial.println("CAMERA OFF!!!!!!!!!!!!!!!");
+      Serial.println("CAMERA OFF!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
       // ******* turn off camera
       // ******* finish logging anything
-      // ******* turn pico to sleep mode
+      // ******* turn pico to sleep mode (might not need this)
     }
   }
   // the else makes sure that the camera will only turn off after the accel is 0 for x duration
@@ -134,8 +124,8 @@ void loop() {
   // ******* check storage
   // ******* if full delet oldest data if not save data
 
-  // if we want we can data log the 10-DOF data (uncomment the line)
-  //datalog10DOF(dataArray)
+  // ----------- Remove after Testing --------------------
+  delay(50); // slows it down for testing
 }
 
 /**
@@ -184,19 +174,20 @@ void read10DOFData() {
 }
 
 bool checkRocketStart(float data[5][3]) {  // needs testing
-  Serial.print("Rocket Start: ");
-  Serial.println(data[3][2] >= ACCEL_Z_THRESHOLD);
+  // Serial.print("Rocket Start: ");
+  // Serial.println(data[3][2] >= ACCEL_Z_THRESHOLD);
   return data[3][2] >= ACCEL_Z_THRESHOLD;
 }
 
 bool checkLanded(float data[5][3]) {  // needs testing
   // check if landed, return if so, return false if not
   bool landed = false;
+  // find the net accel
   float netAccel = sqrt(pow(data[3][0], 2) + pow(data[3][1], 2) + pow(data[3][2], 2));
   Serial.print("Net Accel: ");
   Serial.println(netAccel);
-  // check if z accel value is 0 ish
-  if (netAccel <= NET_RESTING_ACCEL_VALUE) {
+  // check if net accel value is 17000 ish (+ or - 1500)
+  if (NET_RESTING_ACCEL_VALUE - 1500 <= netAccel && netAccel <= NET_RESTING_ACCEL_VALUE + 1500) {
     // now that accel is 0 ish check the altitude just to double check it has landed
     float altitude = ((pow(SEA_LEVEL_PRESSURE / data[1][0], (1 / 5.257)) - 1) * (data[2][0] + 273.15)) / 0.0065;
     Serial.print("Altitude: ");
@@ -209,68 +200,4 @@ bool checkLanded(float data[5][3]) {  // needs testing
   Serial.print("Landed: ");
   Serial.println(landed);
   return landed;  //landed is a bool and will turn true
-}
-
-void datalog10DOF(float data[5][3]) {
-  // Store all the data in the SD card
-  // make a string for assembling the data to log:
-  String dataString = "";
-  /**
-     * The 2D Array is formatted as:
-     * [0] -> Angle (roll,pitch,yaw)
-     * [1] -> Pressure (pressure,0,0)
-     * [2] -> Temperature (temperature,0,0)
-     * [3] -> Acceleration (x,y,z)
-     * [4] -> Gyroscope (x,y,z)
-     * [5] -> Magnetic (x,y,z)
-    */
-  dataString += "ROLL: |";
-  dataString += data[0][0];
-  dataString += "|;  ";
-  dataString += "PITCH: |";
-  dataString += data[0][1];
-  dataString += "|;  ";
-  dataString += "YAW: |";
-  dataString += data[0][2];
-  dataString += "|;  ";
-  dataString += "PRESSURE: |";
-  dataString += data[1][0];
-  dataString += "|;  ";
-  dataString += "TEMP: |";
-  dataString += data[2][0];
-  dataString += "|;  ";
-  dataString += "ACCELERATION: |";
-  dataString += data[3][0];
-  dataString += "|x, |";
-  dataString += data[3][1];
-  dataString += "|y, |";
-  dataString += data[3][2];
-  dataString += "|z;  ";
-  dataString += "GYROSCOPE: |";
-  dataString += data[4][0];
-  dataString += "|x, |";
-  dataString += data[4][1];
-  dataString += "|y, |";
-  dataString += data[4][2];
-  dataString += "|z;  ";
-  dataString += "MAGNETIC: |";
-  dataString += data[5][0];
-  dataString += "|x, |";
-  dataString += data[5][1];
-  dataString += "|y, |";
-  dataString += data[5][2];
-  dataString += "|z";
-
-  // open the file
-  File dataFile = SD.open("datalog.txt", FILE_WRITE);
-
-  // if the file is available, write to it:
-  if (dataFile) {
-    dataFile.println(dataString);
-    dataFile.close();
-  }
-  // if the file isn't open, pop up an error:
-  else {
-    Serial.println("error opening datalog.txt");
-  }
 }
