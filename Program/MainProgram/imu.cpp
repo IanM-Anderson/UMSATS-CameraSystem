@@ -16,7 +16,7 @@ float q0, q1, q2, q3;
 extern "C" {
 #endif
 
-void imuInit(IMU_EN_SENSOR_TYPE *penMotionSensorType)
+bool imuInit(IMU_EN_SENSOR_TYPE *penMotionSensorType)
 {
   bool bRet = false;
   Wire1.setSDA(6);
@@ -27,16 +27,16 @@ void imuInit(IMU_EN_SENSOR_TYPE *penMotionSensorType)
   if( true == bRet)
   {
     MPU9250_Init();
-    calibrateMagn();
+    //calibrateMagn();
   }else{
     Serial.print("init fail\n");
-    while(1);
+    //while(1);
   }
   q0 = 1.0f;  
   q1 = 0.0f;
   q2 = 0.0f;
   q3 = 0.0f;
-  return;
+  return bRet;
 }
 
 void imuDataGet(IMU_ST_ANGLES_DATA *pstAngles, 

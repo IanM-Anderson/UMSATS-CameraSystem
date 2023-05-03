@@ -34,7 +34,7 @@ extern "C" {
     int16_t s16AvgBuffer[8];
   }ICM20948_ST_AVG_DATA;
 
-  void imuInit(IMU_EN_SENSOR_TYPE *penMotionSensorType);
+  bool imuInit(IMU_EN_SENSOR_TYPE *penMotionSensorType);
   void imuDataGet(IMU_ST_ANGLES_DATA *pstAngles, 
           IMU_ST_SENSOR_DATA *pstGyroRawData,
           IMU_ST_SENSOR_DATA *pstAccelRawData,

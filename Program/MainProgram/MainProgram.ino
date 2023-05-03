@@ -6,6 +6,7 @@
 #include <stdint.h>
 #include <SPI.h>
 #include <SD.h>
+#include <Wire.h>
 
 IMU_EN_SENSOR_TYPE enMotionSensorType;
 IMU_ST_ANGLES_DATA stAngles;
@@ -19,6 +20,11 @@ uint8_t u8Buf[3];
 // ---------------------------------------- Variables ----------------------------------------------
 float SEA_LEVEL_PRESSURE = 1013.25;  //pressure in hPa
 bool rocketStart = false;
+// DataLogger:
+const int _MISO = 16;
+const int _MOSI = 19;
+const int _CS = 17;
+const int _SCK = 18;
 
 // 10-DOF:
 /*
@@ -44,29 +50,49 @@ void beepBepper(int pin, int frequency, int duration) {
   tone(pin, frequency);
   delay(duration);  // keep the tone going for some duration
   noTone(pin);      // turn off the tone
+  delay(duration);
 }
 
 void setup() {
   Serial.begin(115200);
+  // the buzzer is on pin 1 (GPIO 0)
+  pinMode(0, OUTPUT);
+  
   // ******* init camera and check that it is inited
 
   // ******* init Datalogger and check that it is inited
+  while (!SD.begin(_CS)) {
+    Serial.println("ERROR init SD");
+    // there is an error so beep multiple times
+    // code for SD error:
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    delay(100);  // wait before you try to init again
+  }
 
   // init 10-DOF and check that it is inited
   while (init10DOF() == false) {
     Serial.println("ERROR init 10-DOF");
-    delay(100);
+    // there is an error so beep multiple times
+    // code for 10-DOF error:
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    delay(200);
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);
+    beepBepper(0, 1000, 100);    
+    delay(100);  // wait before you try to init again
   }
 
   // beep beeper to indicate that it has inited
-  beepBepper(0, 1000, 700);
+  beepBepper(0, 500, 700);
 
   // I dont know if this is needed (i might get rid of it)
   // ******* test the camera, datalogger and 10-DOF
   // beep, beep, beep to indicate that the tests have passed
-  beepBepper(0, 1000, 200);
-  beepBepper(0, 1000, 200);
-  beepBepper(0, 1000, 200);
+  beepBepper(0, 500, 200);
+  beepBepper(0, 500, 200);
+  beepBepper(0, 500, 200);
 
   // ******* start camera recording
 }
@@ -75,12 +101,10 @@ bool init10DOF() {
   // init 10-DOF and return true if successful
   bool initiated = true;
   // init the IMU sensor
-  imuInit(&enMotionSensorType);
-  // check the IMU sensor type
-  if (IMU_EN_SENSOR_TYPE_MPU9250 == enMotionSensorType) {
-    Serial.println("Motion sersor is MPU9250\n");
+  if (!imuInit(&enMotionSensorType)){
+    // if there was an error
+    initiated = false;
   }
-
   // init the main sensor
   if (!LPS22HB_INIT()) {
     // if there was a error
@@ -92,6 +116,8 @@ bool init10DOF() {
 void loop() {
   // read 10-DOF values
   read10DOFData();
+  Serial.print("Nul Accel Counter: ");
+  Serial.println(nulAccelCounter);
   // Serial.println(dataArray[3][0]);
   // Serial.println(dataArray[3][1]);
   // Serial.println(dataArray[3][2]);
@@ -116,7 +142,6 @@ void loop() {
   // the else makes sure that the camera will only turn off after the accel is 0 for x duration
   // if the rocket is still moving in the air (or has not started yet)
   else {
-    Serial.println("Not Camera Off");
     // insure that the nulAccelCounter is 0 while the rocket is still moving
     nulAccelCounter = 0;
   }
@@ -187,7 +212,7 @@ bool checkLanded(float data[5][3]) {  // needs testing
   Serial.print("Net Accel: ");
   Serial.println(netAccel);
   // check if net accel value is 17000 ish (+ or - 1500)
-  if (NET_RESTING_ACCEL_VALUE - 1500 <= netAccel && netAccel <= NET_RESTING_ACCEL_VALUE + 1500) {
+  if (NET_RESTING_ACCEL_VALUE - 1400 <= netAccel && netAccel <= NET_RESTING_ACCEL_VALUE + 900) {
     // now that accel is 0 ish check the altitude just to double check it has landed
     float altitude = ((pow(SEA_LEVEL_PRESSURE / data[1][0], (1 / 5.257)) - 1) * (data[2][0] + 273.15)) / 0.0065;
     Serial.print("Altitude: ");
@@ -197,7 +222,7 @@ bool checkLanded(float data[5][3]) {  // needs testing
       landed = true;
     }
   }
-  Serial.print("Landed: ");
-  Serial.println(landed);
+  // Serial.print("Landed: ");
+  // Serial.println(landed);
   return landed;  //landed is a bool and will turn true
 }
