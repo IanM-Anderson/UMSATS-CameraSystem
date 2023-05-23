@@ -101,7 +101,7 @@
 #ifndef ArduCAM_H
 #define ArduCAM_H
 #include "memorysaver.h"
-#if defined ( RASPBERRY_PI ) 
+#if defined( RASPBERRY_PI ) 
 #else
 	#include "Arduino.h"
 	#include <pins_arduino.h>
