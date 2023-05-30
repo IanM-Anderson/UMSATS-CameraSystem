@@ -39,11 +39,11 @@
 #error Please select the hardware platform and camera module in the ../libraries/ArduCAM/memorysaver.h file
 #endif
 // Version 1, set pin 1 as the slave select for SD:
-#define SD_CS 1
+#define SD_CS 9
 #define pic_mun 200
 #define rate 0x05
 //set pin 16 as the slave select for SPI:
-const int SPI_CS = 16;
+const int SPI_CS = 7;
 #define AVIOFFSET 240
 unsigned long movi_size = 0;
 unsigned long jpeg_size = 0;
